@@ -1,28 +1,44 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Place : MonoBehaviour
+public class Place : WorkingPlace
 {
 
-    public string placeID;
     [SerializeField]
     List<RobotConsole> robotConsoles;
-    [SerializeField]
-    Transform entry;
 
+    public override Vector3 entryPosition => entry != null ? entry.position : base.entryPosition;
+    public Transform entry;     
 
-    public static Place FindPlaceById(string placeID, out Transform entry)
+    protected override void OnRobotArrive(Robot robot)
     {
-        Place[] places = FindObjectsByType<Place>(FindObjectsSortMode.InstanceID);
-        foreach (Place place in places)
+        foreach (RobotConsole console in robotConsoles)
         {
-            if (place.placeID.Equals(placeID,System.StringComparison.OrdinalIgnoreCase))
-            {
-                entry = place.entry;
-                return place;
-            }
+            if (!console.GetFreeSlot(out ConsoleSlot freeSlot))
+                continue;
+
+            robot.workingPlace = this;
+            console.OccupySlot(freeSlot, robot);
+            break;
+
         }
-        entry = null;
-        return null;
     }
+    protected override void OnRobotLeave(Robot robot)
+    {
+        foreach (RobotConsole console in robotConsoles)
+        {
+            if (console.FreeSlotForRobot(robot))
+                break;
+        }
+
+        robot.MoveToLocation(entry.position, () =>
+        {
+            robot.workingPlace = null;
+            robot.currentState = RobotState.Idle;
+            Debug.Log($"Robot has left the {placeID}");
+        });
+    }
+
+    
+
 }

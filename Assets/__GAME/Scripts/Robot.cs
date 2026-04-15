@@ -2,17 +2,20 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
+using static UnityEngine.EventSystems.EventTrigger;
 
 public enum RobotState
 {
     Idle,
     Moving,
-    Working
+    Working,
+    Charging
 }
 
 public static class RobotStates
 {
     public static float energyConsumptionRate = 0.01f;
+    public static float energyRechargeRate = 0.02f;
 }
 
 public class Robot : MonoBehaviour
@@ -21,9 +24,12 @@ public class Robot : MonoBehaviour
     public Image eneryProgress;
 
     NavMeshAgent agent;
-    RobotState currentState = RobotState.Idle;
+
+    [HideInInspector]
+    public RobotState currentState = RobotState.Idle;
 
     float idleTime = 0f;
+    internal WorkingPlace workingPlace;
 
     private void Start()
     {
@@ -32,18 +38,22 @@ public class Robot : MonoBehaviour
 
     void Update()
     {
-        energy -= Time.deltaTime * RobotStates.energyConsumptionRate;
+        if (currentState != RobotState.Charging)
+            energy -= Time.deltaTime * RobotStates.energyConsumptionRate;
+        
 
         if (currentState == RobotState.Idle)
         {
             if (energy < 0.5f)
-            { 
-                Place place = Place.FindPlaceById("Campfire", out Transform entry);
-                MoveToLocation(entry.position, () =>
+            {
+                if (WorkingPlace.FindPlaceById("Campfire", out WorkingPlace place))
                 {
-                    currentState = RobotState.Working;
-                    Debug.Log("Robot is recharging at the campfire.");
-                });
+                    MoveToLocation(place.entryPosition, () =>
+                    {
+                        place.RobotArrive(this);
+                    });
+
+                }
             }
 
             idleTime += Time.deltaTime;
@@ -51,7 +61,20 @@ public class Robot : MonoBehaviour
             {
                 currentState = RobotState.Moving;
 
-                MoveToRandomLocation();
+                if (WorkingPlace.FindPlaceById("Tree", out WorkingPlace place))
+                {
+                    agent.stoppingDistance = place.stoppingDistance;
+                    MoveToLocation(place.entryPosition, () =>
+                    {
+
+                        place.RobotArrive(this);
+                    });
+                }
+                else
+                {
+
+                    MoveToRandomLocation();
+                }
             }
 
         }
@@ -73,10 +96,10 @@ public class Robot : MonoBehaviour
             currentState = RobotState.Idle;
             idleTime = 0;
         });
-        
+
     }
 
-    void MoveToLocation(Vector3 destination, System.Action onArrival)
+    public void MoveToLocation(Vector3 destination, System.Action onArrival)
     {
         currentState = RobotState.Moving;
         agent.SetDestination(destination);
