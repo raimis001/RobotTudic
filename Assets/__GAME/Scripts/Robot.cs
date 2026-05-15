@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.UI;
@@ -31,16 +32,19 @@ public class Robot : MonoBehaviour
     float idleTime = 0f;
     internal WorkingPlace workingPlace;
 
+    Backpack backpack;
+
     private void Start()
     {
         agent = GetComponent<NavMeshAgent>();
+        backpack = GetComponent<Backpack>();
     }
 
     void Update()
     {
         if (currentState != RobotState.Charging)
             energy -= Time.deltaTime * RobotStates.energyConsumptionRate;
-        
+
 
         if (currentState == RobotState.Idle)
         {
@@ -52,7 +56,7 @@ public class Robot : MonoBehaviour
                     {
                         place.RobotArrive(this);
                     });
-
+                    return;
                 }
             }
 
@@ -66,15 +70,28 @@ public class Robot : MonoBehaviour
                     agent.stoppingDistance = place.stoppingDistance;
                     MoveToLocation(place.entryPosition, () =>
                     {
-
                         place.RobotArrive(this);
                     });
+                    return;
                 }
-                else
+                foreach (var item in backpack.items)
                 {
-
-                    MoveToRandomLocation();
+                    Debug.Log($"Checking storage for {item.Key} x{item.Value}");
+                    if (Storage.FindStorageByItem(item.Key, out Storage storage))
+                    {
+                        agent.stoppingDistance = 0.5f;
+                        MoveToLocation(storage.entryPosition.position, () =>
+                        {
+                            storage.StoreItem(item.Key, item.Value);
+                            backpack.RemoveItem(item.Key, item.Value);
+                            currentState = RobotState.Idle;
+                            idleTime = 0;
+                        });
+                        return;
+                    }
                 }
+
+                MoveToRandomLocation();
             }
 
         }
@@ -113,4 +130,6 @@ public class Robot : MonoBehaviour
         }
         onArrival?.Invoke();
     }
+
+
 }

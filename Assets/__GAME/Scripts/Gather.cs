@@ -64,7 +64,8 @@ public class Gather :  WorkingPlace
 
         foreach (var resource in resources)
         {
-            // Here you would add the gathered resources to the robot's inventory or similar
+            // Here you would add the gathered resources to the robot's inventory
+            assignedRobot.GetComponent<Backpack>().AddItem(resource.ID, resource.amount);
             Debug.Log($"Gathered {resource.amount} of {resource.ID}");
         }
 
